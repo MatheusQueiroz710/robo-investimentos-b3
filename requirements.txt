@@ -1,6 +1,4 @@
 yfinance
 google-genai
-python-dotenv
-schedule
 gspread
 google-auth
