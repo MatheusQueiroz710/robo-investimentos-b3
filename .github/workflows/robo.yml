@@ -5,6 +5,9 @@ on:
     - cron: '0 * * * *' # Roda no minuto zero de todas as horas
   workflow_dispatch: # Cria um botão para rodarmos manualmente quando quisermos testar
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # Limpa o aviso de depreciação do Node.js
+
 jobs:
   rodar-robo:
     runs-on: ubuntu-latest
@@ -22,7 +25,7 @@ jobs:
 
       - name: Executar o App
         env:
-          TZ: "America/Sao_Paulo" # Garante que a trava de horário do Python vai ler a hora certa do Brasil
+          TZ: "America/Sao_Paulo" # Garante o fuso horário correto do Brasil
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
           SENHA_APP_EMAIL: ${{ secrets.SENHA_APP_EMAIL }}
