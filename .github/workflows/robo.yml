@@ -1,0 +1,30 @@
+name: Robo B3
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Roda no minuto zero de todas as horas
+  workflow_dispatch: # Cria um botão para rodarmos manualmente quando quisermos testar
+
+jobs:
+  rodar-robo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Puxar o código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar bibliotecas
+        run: pip install -r requirements.txt
+
+      - name: Executar o App
+        env:
+          TZ: "America/Sao_Paulo" # Garante que a trava de horário do Python vai ler a hora certa do Brasil
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
+          SENHA_APP_EMAIL: ${{ secrets.SENHA_APP_EMAIL }}
+          EMAIL_DESTINO: ${{ secrets.EMAIL_DESTINO }}
+        run: python app.py
