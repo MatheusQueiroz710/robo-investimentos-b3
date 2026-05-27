@@ -33,8 +33,8 @@ def mercado_aberto():
     # Travas de segurança para não rodar de madrugada/fds
     if dia_semana >= 5:
         return False
- #   if hora < 10 or hora >= 18:
- #       return False
+#    if hora < 10 or hora >= 18:
+#        return False
         
     return True
 
@@ -46,7 +46,7 @@ def consultar_gemini_relatorio(lista_ativos_atingidos):
 Atue como um analista financeiro sênior. As seguintes ações da bolsa brasileira atingiram meus alvos de compra hoje:
 {texto_ativos}
 
-Por favor, crie um relatório curto e direto estruturado em duas partes:
+Por favor, crie um relatório curto e direto estruturado in duas partes:
 1. Panorama Geral: Como está o índice Ibovespa hoje e o clima geral do mercado financeiro mundial/brasileiro.
 2. Análise dos Ativos: Resuma os principais motivos, notícias recentes ou contexto de mercado que justificam a oscilação específica dessas empresas listadas acima.
 """
@@ -97,7 +97,7 @@ Olá! Aqui está o seu relatório consolidado de investimentos deste ciclo.
         print(f"❌ Erro ao enviar e-mail. Verifique a Senha de App no cofre. Erro: {e}")
 
 def atualizar_planilha(lista_ativos_atingidos):
-    """Acessa o Google Sheets e escreve os alertas na aba Carteira"""
+    """Acessa o Google Sheets e escreve os alertas na aba Histórico de Alertas"""
     try:
         print("📊 Conectando ao Google Sheets...")
         credenciais_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
@@ -110,8 +110,8 @@ def atualizar_planilha(lista_ativos_atingidos):
         credenciais = Credentials.from_service_account_info(credenciais_json, scopes=escopos)
         cliente_sheets = gspread.authorize(credenciais)
         
-        # Abre a sua planilha pelo nome correto e acessa a aba "Carteira"
-        planilha = cliente_sheets.open("Planejamento de investimento").worksheet("Carteira")
+        # Abre a planilha e direciona os dados para a nova aba de histórico
+        planilha = cliente_sheets.open("Planejamento de investimento").worksheet("Histórico de Alertas")
         
         for item in lista_ativos_atingidos:
             nova_linha = [
@@ -122,7 +122,7 @@ def atualizar_planilha(lista_ativos_atingidos):
             ]
             planilha.append_row(nova_linha)
             
-        print("✅ Dados escritos na planilha com sucesso!")
+        print("✅ Dados escritos no Histórico de Alertas com sucesso!")
         
     except Exception as e:
         print(f"❌ Erro ao atualizar o Google Sheets: {e}")
@@ -161,7 +161,7 @@ def executar_pipeline():
     if ativos_atingidos:
         print(f"🚨 {len(ativos_atingidos)} alvo(s) atingido(s)! Gerando relatório e atualizando planilha...")
         
-        # Insere os dados na planilha "Planejamento de investimento"
+        # Insere os dados na aba correta de Histórico
         atualizar_planilha(ativos_atingidos)
         
         # Gera a análise da IA e envia por e-mail
