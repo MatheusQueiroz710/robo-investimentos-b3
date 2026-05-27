@@ -6,6 +6,9 @@ from email.mime.multipart import MIMEMultipart
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+import gspread
+from google.oauth2.service_account import Credentials
+import json
 
 # Carrega as variáveis de ambiente do cofre
 load_dotenv()
@@ -36,8 +39,6 @@ def mercado_aberto():
 
 def consultar_gemini_relatorio(lista_ativos_atingidos):
     """Pede para a IA analisar todos os ativos juntos e o cenário geral da B3"""
-    
-    # Prepara a lista em formato de texto para a IA ler
     texto_ativos = "\n".join([f"- {item['ativo']}: R$ {item['preco_atual']:.2f}" for item in lista_ativos_atingidos])
     
     prompt = f"""
@@ -65,7 +66,6 @@ def enviar_email_consolidado(lista_ativos_atingidos, analise_mercado):
     
     assunto = f"⚠️ RELATÓRIO DE MERCADO: {len(lista_ativos_atingidos)} oportunidade(s) na B3!"
     
-    # Monta a lista formatada para o corpo do e-mail
     texto_lista = ""
     for item in lista_ativos_atingidos:
         texto_lista += f"🎯 {item['ativo']} | Atual: R$ {item['preco_atual']:.2f} (Alvo: R$ {item['preco_alvo']:.2f})\n"
@@ -95,6 +95,37 @@ Olá! Aqui está o seu relatório consolidado de investimentos deste ciclo.
     except Exception as e:
         print(f"❌ Erro ao enviar e-mail. Verifique a Senha de App no cofre. Erro: {e}")
 
+def atualizar_planilha(lista_ativos_atingidos):
+    """Acessa o Google Sheets e escreve os alertas na aba Carteira"""
+    try:
+        print("📊 Conectando ao Google Sheets...")
+        credenciais_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+        
+        escopos = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
+        credenciais = Credentials.from_service_account_info(credenciais_json, scopes=escopos)
+        cliente_sheets = gspread.authorize(credenciais)
+        
+        # ATENÇÃO: Substitua "NOME_DA_SUA_PLANILHA" pelo nome exato do seu arquivo
+        planilha = cliente_sheets.open("NOME_DA_SUA_PLANILHA").worksheet("Carteira")
+        
+        for item in lista_ativos_atingidos:
+            nova_linha = [
+                datetime.now().strftime('%d/%m/%Y %H:%M'),
+                item['ativo'],
+                f"R$ {item['preco_atual']:.2f}",
+                f"R$ {item['preco_alvo']:.2f}"
+            ]
+            planilha.append_row(nova_linha)
+            
+        print("✅ Dados escritos na planilha com sucesso!")
+        
+    except Exception as e:
+        print(f"❌ Erro ao atualizar o Google Sheets: {e}")
+
 def executar_pipeline():
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Iniciando verificação de mercado...")
     
@@ -102,7 +133,7 @@ def executar_pipeline():
         print("Mercado fechado. Aguardando próximo ciclo.")
         return
 
-    ativos_atingidos = [] # Cria uma lista vazia para guardar os alertas
+    ativos_atingidos = [] 
 
     for ativo, preco_alvo in CARTEIRA_MONITORAMENTO:
         try:
@@ -116,7 +147,6 @@ def executar_pipeline():
             preco_atual = dados_hoje['Close'].iloc[0]
             print(f"Analisando {ativo}: Atual R$ {preco_atual:.2f} | Alvo R$ {preco_alvo:.2f}")
             
-            # Se bater o alvo, guarda os dados na lista em vez de mandar e-mail direto
             if preco_atual <= preco_alvo:
                 ativos_atingidos.append({
                     "ativo": ativo,
@@ -127,9 +157,13 @@ def executar_pipeline():
         except Exception as e:
             print(f"Erro ao processar o ativo {ativo}: {e}")
 
-    # Fora do loop: Verifica se algum ativo entrou na lista
     if ativos_atingidos:
-        print(f"🚨 {len(ativos_atingidos)} alvo(s) atingido(s)! Gerando relatório com a IA...")
+        print(f"🚨 {len(ativos_atingidos)} alvo(s) atingido(s)! Gerando relatório e atualizando planilha...")
+        
+        # Chama a nova função da planilha
+        atualizar_planilha(ativos_atingidos)
+        
+        # Continua o envio do e-mail
         analise = consultar_gemini_relatorio(ativos_atingidos)
         enviar_email_consolidado(ativos_atingidos, analise)
     else:
