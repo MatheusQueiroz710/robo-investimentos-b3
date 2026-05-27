@@ -29,8 +29,8 @@ def mercado_aberto():
     # Travas de segurança para não rodar de madrugada/fds
     if dia_semana >= 5:
         return False
-    if hora < 10 or hora >= 18:
-        return False
+    #if hora < 10 or hora >= 18:
+       # return False
         
     return True
 
