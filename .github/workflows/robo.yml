@@ -2,11 +2,11 @@ name: Robo B3
 
 on:
   schedule:
-    - cron: '0 * * * *' # Roda no minuto zero de todas as horas
-  workflow_dispatch: # Cria um botão para rodarmos manualmente quando quisermos testar
+    - cron: '0 * * * *' 
+  workflow_dispatch: 
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # Limpa o aviso de depreciação do Node.js
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
 
 jobs:
   rodar-robo:
@@ -25,9 +25,10 @@ jobs:
 
       - name: Executar o App
         env:
-          TZ: "America/Sao_Paulo" # Garante o fuso horário correto do Brasil
+          TZ: "America/Sao_Paulo" 
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
           SENHA_APP_EMAIL: ${{ secrets.SENHA_APP_EMAIL }}
           EMAIL_DESTINO: ${{ secrets.EMAIL_DESTINO }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: python app.py
