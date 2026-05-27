@@ -31,12 +31,12 @@ def mercado_aberto():
     hora = agora.hour
     
     # Travas de segurança para não rodar de madrugada/fds
-   # if dia_semana >= 5:
-       # return False
-    #if hora < 06 or hora >= 18:
-       # return False
+    if dia_semana >= 5:
+        return False
+ #   if hora < 10 or hora >= 18:
+ #       return False
         
-    #return True
+    return True
 
 def consultar_gemini_relatorio(lista_ativos_atingidos):
     """Pede para a IA analisar todos os ativos juntos e o cenário geral da B3"""
