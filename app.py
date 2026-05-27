@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Carrega as variáveis de ambiente de forma segura
+# Carrega as variáveis de ambiente do cofre
 load_dotenv()
 
 # Configuração da IA (Gemini Client)
@@ -34,8 +34,20 @@ def mercado_aberto():
         
     return True
 
-def consultar_gemini(ativo, preco):
-    prompt = f"A ação {ativo} está custando atualmente R$ {preco:.2f} e atingiu um preço baixo. Resuma em um parágrafo curto e direto em português as principais notícias recentes ou o contexto de mercado que justificam a oscilação dessa empresa hoje."
+def consultar_gemini_relatorio(lista_ativos_atingidos):
+    """Pede para a IA analisar todos os ativos juntos e o cenário geral da B3"""
+    
+    # Prepara a lista em formato de texto para a IA ler
+    texto_ativos = "\n".join([f"- {item['ativo']}: R$ {item['preco_atual']:.2f}" for item in lista_ativos_atingidos])
+    
+    prompt = f"""
+Atue como um analista financeiro sênior. As seguintes ações da bolsa brasileira atingiram meus alvos de compra hoje:
+{texto_ativos}
+
+Por favor, crie um relatório curto e direto estruturado em duas partes:
+1. Panorama Geral: Como está o índice Ibovespa hoje e o clima geral do mercado financeiro mundial/brasileiro.
+2. Análise dos Ativos: Resuma os principais motivos, notícias recentes ou contexto de mercado que justificam a oscilação específica dessas empresas listadas acima.
+"""
     try:
         resposta = client.models.generate_content(
             model='gemini-2.5-flash',
@@ -45,22 +57,27 @@ def consultar_gemini(ativo, preco):
     except Exception as e:
         return f"Erro ao consultar a IA: {e}"
 
-def enviar_email(ativo, preco_atual, preco_alvo, analise):
+def enviar_email_consolidado(lista_ativos_atingidos, analise_mercado):
+    """Envia um único e-mail com a lista de ativos e a análise da IA"""
     remetente = os.getenv("EMAIL_REMETENTE")
     senha = os.getenv("SENHA_APP_EMAIL")
     destino = os.getenv("EMAIL_DESTINO")
     
-    assunto = f"⚠️ OPORTUNIDADE B3: {ativo} atingiu o alvo!"
+    assunto = f"⚠️ RELATÓRIO DE MERCADO: {len(lista_ativos_atingidos)} oportunidade(s) na B3!"
+    
+    # Monta a lista formatada para o corpo do e-mail
+    texto_lista = ""
+    for item in lista_ativos_atingidos:
+        texto_lista += f"🎯 {item['ativo']} | Atual: R$ {item['preco_atual']:.2f} (Alvo: R$ {item['preco_alvo']:.2f})\n"
     
     corpo = f"""
-Alerta de Oportunidade de Investimento
+Olá! Aqui está o seu relatório consolidado de investimentos deste ciclo.
     
-Ativo: {ativo}
-Preço Alvo Estipulado: R$ {preco_alvo:.2f}
-Preço Atual de Mercado: R$ {preco_atual:.2f}
+--- ATIVOS QUE ATINGIRAM O ALVO ---
+{texto_lista}
     
---- Contexto da IA (Gemini) ---
-{analise}
+--- ANÁLISE DE MERCADO (GEMINI IA) ---
+{analise_mercado}
 """
     msg = MIMEMultipart()
     msg['From'] = remetente
@@ -74,7 +91,7 @@ Preço Atual de Mercado: R$ {preco_atual:.2f}
         servidor.login(remetente, senha)
         servidor.sendmail(remetente, destino, msg.as_string())
         servidor.quit()
-        print(f"✅ E-mail de alerta enviado com sucesso para {ativo}.")
+        print(f"✅ Relatório consolidado enviado com sucesso!")
     except Exception as e:
         print(f"❌ Erro ao enviar e-mail. Verifique a Senha de App no cofre. Erro: {e}")
 
@@ -82,8 +99,10 @@ def executar_pipeline():
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Iniciando verificação de mercado...")
     
     if not mercado_aberto():
-        print("Mercado fechado. O Cron Job da nuvem rodou, mas a B3 está inativa. Aguardando próximo ciclo.")
+        print("Mercado fechado. Aguardando próximo ciclo.")
         return
+
+    ativos_atingidos = [] # Cria uma lista vazia para guardar os alertas
 
     for ativo, preco_alvo in CARTEIRA_MONITORAMENTO:
         try:
@@ -97,16 +116,27 @@ def executar_pipeline():
             preco_atual = dados_hoje['Close'].iloc[0]
             print(f"Analisando {ativo}: Atual R$ {preco_atual:.2f} | Alvo R$ {preco_alvo:.2f}")
             
+            # Se bater o alvo, guarda os dados na lista em vez de mandar e-mail direto
             if preco_atual <= preco_alvo:
-                print(f"🚨 Alvo atingido para {ativo}! Consultando a IA...")
-                analise = consultar_gemini(ativo, preco_atual)
-                enviar_email(ativo, preco_atual, preco_alvo, analise)
+                ativos_atingidos.append({
+                    "ativo": ativo,
+                    "preco_atual": preco_atual,
+                    "preco_alvo": preco_alvo
+                })
                 
         except Exception as e:
             print(f"Erro ao processar o ativo {ativo}: {e}")
 
+    # Fora do loop: Verifica se algum ativo entrou na lista
+    if ativos_atingidos:
+        print(f"🚨 {len(ativos_atingidos)} alvo(s) atingido(s)! Gerando relatório com a IA...")
+        analise = consultar_gemini_relatorio(ativos_atingidos)
+        enviar_email_consolidado(ativos_atingidos, analise)
+    else:
+        print("Tranquilidade. Nenhum ativo atingiu o preço alvo neste ciclo.")
+
 # =========================================================
-# GATILHO PRINCIPAL (Acionado pelo servidor do GitHub)
+# GATILHO PRINCIPAL
 # =========================================================
 if __name__ == "__main__":
     print("🤖 Robô acionado pela Nuvem.")
