@@ -10,13 +10,14 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 
-# Carrega as variáveis de ambiente do cofre
+# Carrega as variáveis de ambiente de forma segura
 load_dotenv()
 
 # Configuração da IA (Gemini Client)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # ---------------- CONFIGURAÇÃO DA CARTEIRA ----------------
+# Altere os valores abaixo para os seus preços-alvo reais quando quiser rodar para valer
 CARTEIRA_MONITORAMENTO = [
     ("PETR4.SA", 100.00), 
     ("VALE3.SA", 150.00)
@@ -30,12 +31,12 @@ def mercado_aberto():
     hora = agora.hour
     
     # Travas de segurança para não rodar de madrugada/fds
-    if dia_semana >= 5:
-        return False
-    if hora < 10 or hora >= 18:
-        return False
+   # if dia_semana >= 5:
+       # return False
+    #if hora < 06 or hora >= 18:
+       # return False
         
-    return True
+    #return True
 
 def consultar_gemini_relatorio(lista_ativos_atingidos):
     """Pede para a IA analisar todos os ativos juntos e o cenário geral da B3"""
@@ -109,8 +110,8 @@ def atualizar_planilha(lista_ativos_atingidos):
         credenciais = Credentials.from_service_account_info(credenciais_json, scopes=escopos)
         cliente_sheets = gspread.authorize(credenciais)
         
-        # ATENÇÃO: Substitua "NOME_DA_SUA_PLANILHA" pelo nome exato do seu arquivo
-        planilha = cliente_sheets.open("NOME_DA_SUA_PLANILHA").worksheet("Carteira")
+        # Abre a sua planilha pelo nome correto e acessa a aba "Carteira"
+        planilha = cliente_sheets.open("Planejamento de investimento").worksheet("Carteira")
         
         for item in lista_ativos_atingidos:
             nova_linha = [
@@ -130,7 +131,7 @@ def executar_pipeline():
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Iniciando verificação de mercado...")
     
     if not mercado_aberto():
-        print("Mercado fechado. Aguardando próximo ciclo.")
+        print("Mercado fechado. O script rodou, mas a B3 está inativa. Aguardando próximo ciclo.")
         return
 
     ativos_atingidos = [] 
@@ -160,17 +161,17 @@ def executar_pipeline():
     if ativos_atingidos:
         print(f"🚨 {len(ativos_atingidos)} alvo(s) atingido(s)! Gerando relatório e atualizando planilha...")
         
-        # Chama a nova função da planilha
+        # Insere os dados na planilha "Planejamento de investimento"
         atualizar_planilha(ativos_atingidos)
         
-        # Continua o envio do e-mail
+        # Gera a análise da IA e envia por e-mail
         analise = consultar_gemini_relatorio(ativos_atingidos)
         enviar_email_consolidado(ativos_atingidos, analise)
     else:
         print("Tranquilidade. Nenhum ativo atingiu o preço alvo neste ciclo.")
 
 # =========================================================
-# GATILHO PRINCIPAL
+# GATILHO PRINCIPAL (Acionado pelo GitHub Actions)
 # =========================================================
 if __name__ == "__main__":
     print("🤖 Robô acionado pela Nuvem.")
