@@ -1,24 +1,20 @@
 import yfinance as yf
-import google.generativeai as genai
+from google import genai
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
-import time
 from datetime import datetime
 from dotenv import load_dotenv
-import schedule
 
-# Carrega as variáveis do .env
+# Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
 
-# Configuração da IA (Gemini)
-genai.configure(api_key=os.getenv("AIzaSyARFCVKY92NFdvFAcHX1SXtmYKZovNwFFU"))
-modelo_ia = genai.GenerativeModel('gemini-2.5-flash')
+# Configuração da NOVA IA (Gemini Client)
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # ---------------- CONFIGURAÇÃO DA CARTEIRA ----------------
-# Altere os valores alvo para números bem altos para forçar o primeiro teste!
-# Exemplo: PETR4 está em 38.00, coloque alvo em 100.00
+# Lembre-se de colocar seus preços alvos reais quando for rodar para valer!
 CARTEIRA_MONITORAMENTO = [
     ("PETR4.SA", 100.00), 
     ("VALE3.SA", 150.00)
@@ -28,24 +24,25 @@ CARTEIRA_MONITORAMENTO = [
 def mercado_aberto():
     """Verifica se é dia útil e se a B3 está operando (10h às 17h)"""
     agora = datetime.now()
-    dia_semana = agora.weekday() 
+    dia_semana = agora.weekday() # 0 = Segunda, 4 = Sexta, 5 = Sábado, 6 = Domingo
     hora = agora.hour
     
-    # Para o NOSSO TESTE AGORA, vamos comentar (desativar) a trava de segurança 
-    # para garantir que o script rode mesmo se você estiver testando à noite ou no final de semana.
-    # Descomente (remova o #) dessas 4 linhas abaixo depois que validar o funcionamento:
-    
-    # if dia_semana >= 5:
-    #     return False
-    # if hora < 10 or hora >= 18:
-    #     return False
+    # Travas de segurança para a nuvem (evita gastar requisições à toa)
+    if dia_semana >= 5:
+        return False
+    if hora < 10 or hora >= 18:
+        return False
         
     return True
 
 def consultar_gemini(ativo, preco):
     prompt = f"A ação {ativo} está custando atualmente R$ {preco:.2f} e atingiu um preço baixo. Resuma em um parágrafo curto e direto em português as principais notícias recentes ou o contexto de mercado que justificam a oscilação dessa empresa hoje."
     try:
-        resposta = modelo_ia.generate_content(prompt)
+        # Consulta usando a versão 2.5 Flash
+        resposta = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
         return resposta.text
     except Exception as e:
         return f"Erro ao consultar a IA: {e}"
@@ -79,15 +76,15 @@ Preço Atual de Mercado: R$ {preco_atual:.2f}
         servidor.login(remetente, senha)
         servidor.sendmail(remetente, destino, msg.as_string())
         servidor.quit()
-        print(f"✅ E-mail de alerta enviado para {ativo}.")
+        print(f"✅ E-mail de alerta enviado com sucesso para {ativo}.")
     except Exception as e:
-        print(f"❌ Erro ao enviar e-mail. Verifique suas credenciais no .env. Erro: {e}")
+        print(f"❌ Erro ao enviar e-mail. Verifique a Senha de App no .env. Erro: {e}")
 
 def executar_pipeline():
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] Iniciando verificação de mercado...")
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Iniciando verificação de mercado...")
     
     if not mercado_aberto():
-        print("Mercado fechado. Aguardando próximo ciclo.")
+        print("Mercado fechado. O Cron Job da nuvem rodou, mas a B3 está inativa. Aguardando próximo ciclo.")
         return
 
     for ativo, preco_alvo in CARTEIRA_MONITORAMENTO:
@@ -110,15 +107,9 @@ def executar_pipeline():
         except Exception as e:
             print(f"Erro ao processar o ativo {ativo}: {e}")
 
-# Configura o agendador para rodar a cada hora
-schedule.every(1).hours.do(executar_pipeline)
-
+# =========================================================
+# GATILHO PRINCIPAL (Acionado pelo servidor do Render)
+# =========================================================
 if __name__ == "__main__":
-    print("🤖 Robô de Investimentos Iniciado.")
-    # Executa imediatamente a primeira vez
+    print("🤖 Robô acionado pela Nuvem.")
     executar_pipeline()
-    
-    # Mantém o programa rodando (apenas aperte Ctrl+C no terminal se quiser parar)
-    while True:
-        schedule.run_pending()
-        time.sleep(10)
