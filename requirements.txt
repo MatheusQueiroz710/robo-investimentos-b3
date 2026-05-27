@@ -2,3 +2,4 @@ yfinance
 google-genai
 gspread
 google-auth
+python-dotenv
