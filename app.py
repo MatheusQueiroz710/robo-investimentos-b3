@@ -7,14 +7,13 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Carrega as variáveis de ambiente do arquivo .env
+# Carrega as variáveis de ambiente de forma segura
 load_dotenv()
 
-# Configuração da NOVA IA (Gemini Client)
+# Configuração da IA (Gemini Client)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # ---------------- CONFIGURAÇÃO DA CARTEIRA ----------------
-# Lembre-se de colocar seus preços alvos reais quando for rodar para valer!
 CARTEIRA_MONITORAMENTO = [
     ("PETR4.SA", 100.00), 
     ("VALE3.SA", 150.00)
@@ -24,10 +23,10 @@ CARTEIRA_MONITORAMENTO = [
 def mercado_aberto():
     """Verifica se é dia útil e se a B3 está operando (10h às 17h)"""
     agora = datetime.now()
-    dia_semana = agora.weekday() # 0 = Segunda, 4 = Sexta, 5 = Sábado, 6 = Domingo
+    dia_semana = agora.weekday() 
     hora = agora.hour
     
-    # Travas de segurança para a nuvem (evita gastar requisições à toa)
+    # Travas de segurança para não rodar de madrugada/fds
     if dia_semana >= 5:
         return False
     if hora < 10 or hora >= 18:
@@ -38,7 +37,6 @@ def mercado_aberto():
 def consultar_gemini(ativo, preco):
     prompt = f"A ação {ativo} está custando atualmente R$ {preco:.2f} e atingiu um preço baixo. Resuma em um parágrafo curto e direto em português as principais notícias recentes ou o contexto de mercado que justificam a oscilação dessa empresa hoje."
     try:
-        # Consulta usando a versão 2.5 Flash
         resposta = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt
@@ -78,7 +76,7 @@ Preço Atual de Mercado: R$ {preco_atual:.2f}
         servidor.quit()
         print(f"✅ E-mail de alerta enviado com sucesso para {ativo}.")
     except Exception as e:
-        print(f"❌ Erro ao enviar e-mail. Verifique a Senha de App no .env. Erro: {e}")
+        print(f"❌ Erro ao enviar e-mail. Verifique a Senha de App no cofre. Erro: {e}")
 
 def executar_pipeline():
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Iniciando verificação de mercado...")
@@ -108,7 +106,7 @@ def executar_pipeline():
             print(f"Erro ao processar o ativo {ativo}: {e}")
 
 # =========================================================
-# GATILHO PRINCIPAL (Acionado pelo servidor do Render)
+# GATILHO PRINCIPAL (Acionado pelo servidor do GitHub)
 # =========================================================
 if __name__ == "__main__":
     print("🤖 Robô acionado pela Nuvem.")
